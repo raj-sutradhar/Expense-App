@@ -105,7 +105,7 @@ async function runMigration() {
       await pool.query(`CREATE TABLE IF NOT EXISTS ${tableName} (id SERIAL PRIMARY KEY)`);
 
       for (const [colName, colDef] of Object.entries(columns)) {
-        // Special case: if clients table has column 'name' but lacks 'full_name', rename it
+        // Special case: if clients table has column 'name', rename or drop it
         if (tableName === "clients" && colName === "full_name") {
           const hasName = await pool.query(`
             SELECT EXISTS (
@@ -128,6 +128,40 @@ async function runMigration() {
             console.log("Renaming column 'name' to 'full_name' in table 'clients'...");
             await pool.query("ALTER TABLE clients RENAME COLUMN name TO full_name");
             continue;
+          } else if (hasName.rows[0].exists && hasFullName.rows[0].exists) {
+            console.log("Both 'name' and 'full_name' exist in 'clients'. Copying data and dropping 'name'...");
+            await pool.query("UPDATE clients SET full_name = name WHERE full_name IS NULL OR full_name = ''");
+            await pool.query("ALTER TABLE clients DROP COLUMN name");
+          }
+        }
+
+        // Special case: if accounts table has column 'name', rename or drop it
+        if (tableName === "accounts" && colName === "account_name") {
+          const hasName = await pool.query(`
+            SELECT EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+                AND table_name = 'accounts' 
+                AND column_name = 'name'
+            )
+          `);
+          const hasAccountName = await pool.query(`
+            SELECT EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+                AND table_name = 'accounts' 
+                AND column_name = 'account_name'
+            )
+          `);
+
+          if (hasName.rows[0].exists && !hasAccountName.rows[0].exists) {
+            console.log("Renaming column 'name' to 'account_name' in table 'accounts'...");
+            await pool.query("ALTER TABLE accounts RENAME COLUMN name TO account_name");
+            continue;
+          } else if (hasName.rows[0].exists && hasAccountName.rows[0].exists) {
+            console.log("Both 'name' and 'account_name' exist in 'accounts'. Copying data and dropping 'name'...");
+            await pool.query("UPDATE accounts SET account_name = name WHERE account_name IS NULL OR account_name = ''");
+            await pool.query("ALTER TABLE accounts DROP COLUMN name");
           }
         }
 
