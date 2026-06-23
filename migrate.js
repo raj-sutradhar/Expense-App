@@ -165,6 +165,36 @@ async function runMigration() {
           }
         }
 
+        // Special case: if transactions table has column 'type', rename or drop it
+        if (tableName === "transactions" && colName === "transaction_type") {
+          const hasType = await pool.query(`
+            SELECT EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+                AND table_name = 'transactions' 
+                AND column_name = 'type'
+            )
+          `);
+          const hasTransactionType = await pool.query(`
+            SELECT EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+                AND table_name = 'transactions' 
+                AND column_name = 'transaction_type'
+            )
+          `);
+
+          if (hasType.rows[0].exists && !hasTransactionType.rows[0].exists) {
+            console.log("Renaming column 'type' to 'transaction_type' in table 'transactions'...");
+            await pool.query("ALTER TABLE transactions RENAME COLUMN type TO transaction_type");
+            continue;
+          } else if (hasType.rows[0].exists && hasTransactionType.rows[0].exists) {
+            console.log("Both 'type' and 'transaction_type' exist in 'transactions'. Copying data and dropping 'type'...");
+            await pool.query("UPDATE transactions SET transaction_type = type WHERE transaction_type IS NULL OR transaction_type = ''");
+            await pool.query("ALTER TABLE transactions DROP COLUMN type");
+          }
+        }
+
         // Standard column check
         const colCheck = await pool.query(`
           SELECT EXISTS (
