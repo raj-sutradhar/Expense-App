@@ -1,4 +1,4 @@
-﻿CREATE TABLE users (
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
@@ -57,5 +57,28 @@ CREATE TABLE transactions (
 
     balance_after NUMERIC(12,2),
 
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE payment_history (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER REFERENCES clients(id),
+    account_id INTEGER REFERENCES accounts(id),
+    fee_amount NUMERIC(12,2),
+    paid_amount NUMERIC(12,2),
+    due_amount NUMERIC(12,2),
+    billing_start DATE,
+    billing_end DATE,
+    remarks TEXT,
+    payment_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE account_transfers (
+    id SERIAL PRIMARY KEY,
+    from_account_id INTEGER REFERENCES accounts(id),
+    to_account_id INTEGER REFERENCES accounts(id),
+    amount NUMERIC(12,2) NOT NULL,
+    remarks TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );

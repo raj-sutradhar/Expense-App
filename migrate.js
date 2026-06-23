@@ -15,7 +15,25 @@ const pool = new Pool({
 async function runMigration() {
   try {
     console.log("Connecting to PG database for migration...");
+
+    // Check if the 'users' table exists, if not, initialize the schema
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+          AND table_name = 'users'
+      )
+    `);
     
+    if (!tableCheck.rows[0].exists) {
+      console.log("Database schema not found. Initializing schema from schema.sql...");
+      const fs = require("fs");
+      const path = require("path");
+      const schemaSql = fs.readFileSync(path.join(__dirname, "database", "schema.sql"), "utf8");
+      await pool.query(schemaSql);
+      console.log("Schema initialized successfully!");
+    }
+
     // Ensure there is at least one user in the database to assign existing orphaned rows to.
     const userCheck = await pool.query("SELECT id FROM users LIMIT 1");
     let defaultUserId = null;
